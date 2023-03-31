@@ -11,7 +11,7 @@ from optuna.integration import XGBoostPruningCallback, OptunaSearchCV
 
 class HyperXGBoost:
     
-    def __init__(self, task:str = 'regression', model_params: dict = {}, n_jobs = 1):
+    def __init__(self, task:str = 'regression', model_params: dict = {}, n_jobs = 1, visualization = 'plotly'):
          
         self._DEFAULT_TASKS = ['regression', 'classification']
         self._FS = (14, 6)  # figure size
@@ -24,6 +24,7 @@ class HyperXGBoost:
         self._EARLY_STOPPING_ROUNDS = 100 # XGBoost
         self.model_params_ = model_params
         self.task_ = task if task in self._DEFAULT_TASKS else raise_error()
+        self._visualization = visualization
     
     def raise_error():
         raise ValueError(f"Mentioned {self.task_} is not supported !!! Choose either 'regression' or 'classification'.")
@@ -47,13 +48,13 @@ class HyperXGBoost:
             def objective(trial, verbose=1, n_jobs=self._N_JOBS):
                 
                 param = {
-                    'max_depth': trial.suggest_int('max_depth', 5,20),
-                    'learning_rate': trial.suggest_float('learning_rate', 0.01, 1.0),
-                    'n_estimators': trial.suggest_int('n_estimators', 50, 1000),
+                    'max_depth': trial.suggest_int('max_depth', 5,30),
+                    'learning_rate': trial.suggest_categorical('learning_rate', [0.0001, 0.0005,0.001, 0.005 ,0.01, 0.05, 0.1, 0.35, 0.5, 0.75, 0.9, 1.0,]),
+                    'n_estimators': trial.suggest_categorical('n_estimators', [100, 200, 500, 700, 1000, 1500, 2000, 3500, 5000]),
                     'min_child_weight': trial.suggest_int('min_child_weight', 1, 10),
                     'gamma': trial.suggest_float('gamma', 0.01, 1.0),
                     'subsample': trial.suggest_categorical('subsample', [0.4,0.5,0.6,0.7,0.8,1.0]),
-                    'colsample_bytree': trial.suggest_float('colsample_bytree', 0.01, 1.0),
+                    'colsample_bytree': trial.suggest_float('colsample_bytree', 0.001, 1.0),
                     'reg_alpha': trial.suggest_float('reg_alpha', 0.01, 10.0),
                     'reg_lambda': trial.suggest_float('reg_lambda', 0.01, 10.0),
                     #'random_state': trial.suggest_categorical('random_state', [10,20,30,40,60,100])
@@ -133,6 +134,24 @@ class HyperXGBoost:
             print(f'RMSE: {np.sqrt(mean_squared_error(self.y_test, self.y_pred))}')
             print(f'R2_Score: {r2_score(self.y_test, self.y_pred)}')
             
+    def plot_parameter_importance(self,**kwargs):
+        if self._visualization == 'matplotlib':
+            return optuna.visualization.matplotlib.plot_param_importances(self.study_, **kwargs)
+        else:
+            return optuna.visualization.plot_param_importances(self.study_, **kwargs)
+    
+    def plot_parameter_relationships(self,**kwargs):
+        if self._visualization == 'matplotlib':
+            return optuna.visualization.matplotlib.plot_parallel_coordinate(self.study_, **kwargs)
+        else:
+            return optuna.visualization.plot_parallel_coordinate(self.study_, **kwargs)
+    
+    def plot_optimization_history(self, **kwargs):
+        if self._visualization == 'matplotlib':
+            return optuna.visualization.matplotlib.plot_optimization_history(self.study_, **kwargs)
+        else:
+            return optuna.visualization.plot_optimization_history(self.study_, **kwargs)      
+              
     
     def save(self, model, file_path):
         output_file = open(f"{file_path}/{model}_{self.task_}.pickle", "w")
